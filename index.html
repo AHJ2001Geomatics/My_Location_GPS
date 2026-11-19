@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#101827">
+<title>My Location GPS</title>
+
+<link rel="stylesheet"
+href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Tahoma, Arial, sans-serif;
+  background: #101827;
+  color: white;
+}
+
+header {
+  padding: 18px;
+  background: #172438;
+  text-align: center;
+  border-bottom: 1px solid #304258;
+}
+
+header h2 {
+  margin: 0;
+  font-size: 21px;
+}
+
+header p {
+  color: #a9bdd1;
+  font-size: 12px;
+  margin-bottom: 0;
+}
+
+.container {
+  max-width: 850px;
+  margin: auto;
+  padding: 14px;
+}
+
+#map {
+  height: 420px;
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid #34465b;
+  z-index: 1;
+}
+
+.info {
+  background: #1c2b40;
+  padding: 15px;
+  border-radius: 14px;
+  margin-top: 14px;
+}
+
+.info h3 {
+  margin-top: 0;
+  font-size: 15px;
+}
+
+.coordinates {
+  direction: ltr;
+  text-align: left;
+  font-size: 14px;
+  line-height: 2;
+  color: #55d6be;
+  overflow-wrap: anywhere;
+}
+
+.buttons {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+
+button {
+  padding: 14px 8px;
+  border: none;
+  border-radius: 11px;
+  background: #263a54;
+  color: white;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:active {
+  transform: scale(.97);
+}
+
+.primary {
+  background: #087e72;
+}
+
+.blue {
+  background: #2563eb;
+}
+
+.orange {
+  background: #b66b19;
+}
+
+.red {
+  background: #a83e4c;
+}
+
+button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.status {
+  color: #a9bdd1;
+  font-size: 12px;
+  margin-top: 12px;
+  text-align: center;
+}
+
+.saved-item {
+  background: #263a54;
+  padding: 12px;
+  margin-top: 9px;
+  border-radius: 10px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.saved-item button {
+  margin: 8px 4px 0 0;
+  padding: 8px 12px;
+  font-size: 11px;
+}
+
+footer {
+  text-align: center;
+  color: #8093a8;
+  font-size: 11px;
+  padding: 22px;
+}
+
+@media(max-width:450px) {
+  #map {
+    height: 360px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h2>📍 My Location GPS</h2>
+  <p>نقشه هوشمند موقعیت‌یابی و ذخیره مختصات</p>
+</header>
+
+<div class="container">
+
+  <div id="map"></div>
+
+  <div class="info">
+    <h3>📡 اطلاعات موقعیت فعلی</h3>
+
+    <div class="coordinates">
+      Latitude: <span id="lat">---</span><br>
+      Longitude: <span id="lng">---</span><br>
+      Accuracy: <span id="accuracy">---</span>
+    </div>
+
+    <div class="status" id="status">
+      برای دریافت موقعیت، دکمه مکان‌یابی را بزنید.
+    </div>
+  </div>
+
+  <div class="buttons">
+    <button class="primary" onclick="getLocation()">
+      📍 موقعیت فعلی من
+    </button>
+
+    <button class="blue" onclick="saveLocation()">
+      💾 ذخیره موقعیت
+    </button>
+
+    <button onclick="shareLocation()">
+      📤 اشتراک‌گذاری
+    </button>
+
+    <button onclick="copyCoordinates()">
+      📋 کپی مختصات
+    </button>
+
+    <button class="orange" onclick="openGoogleMaps()">
+      🌍 مشاهده در گوگل‌مپ
+    </button>
+
+    <button onclick="watchLocation()">
+      🔄 ردیابی زنده
+    </button>
+
+    <button onclick="stopTracking()">
+      ⏹ توقف ردیابی
+    </button>
+
+    <button onclick="map.locate({setView:true,maxZoom:18})">
+      🗺️ پیدا کردن روی نقشه
+    </button>
+  </div>
+
+  <div class="info">
+    <h3>⭐ موقعیت‌های ذخیره‌شده</h3>
+    <div id="savedLocations">
+      هنوز موقعیتی ذخیره نشده است.
+    </div>
+    <button class="red" onclick="clearLocations()"
+      style="margin-top:12px">
+      🗑️ حذف تمام موقعیت‌ها
+    </button>
+  </div>
+
+</div>
+
+<footer>
+  My Location GPS | Powered by OpenStreetMap
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+
+// ایجاد نقشه
+const map = L.map('map').setView([35.6892, 51.3890], 5);
+
+// نقشه پایه
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+let currentPosition = null;
+let currentMarker = null;
+let accuracyCircle = null;
+let watchID = null;
+
+// دریافت موقعیت
+function getLocation() {
+
+  if (!navigator.geolocation) {
+    alert('مرورگر شما از GPS پشتیبانی نمی‌کند.');
+    return;
+  }
+
+  document.getElementById('status').textContent =
+    'در حال دریافت موقعیت شما...';
+
+  navigator.geolocation.getCurrentPosition(
+
+    function(position) {
+      updatePosition(position);
+    },
+
+    function(error) {
+      document.getElementById('status').textContent =
+        'خطا در دریافت موقعیت: ' + error.message;
+    },
+
+    {
+      enableHighAccuracy: true,
+      timeout: 20000,
+      maximumAge: 0
+    }
+
+  );
+}
+
+// به‌روزرسانی موقعیت
+function updatePosition(position) {
+
+  const lat = position.coords.latitude;
+  const lng = position.coords.longitude;
+  const accuracy = position.coords.accuracy;
+
+  currentPosition = {lat, lng, accuracy};
+
+  document.getElementById('lat').textContent = lat.toFixed(7);
+  document.getElementById('lng').textContent = lng.toFixed(7);
+  document.getElementById('accuracy').textContent =
+    Math.round(accuracy) + ' متر';
+
+  document.getElementById('status').textContent =
+    'موقعیت با موفقیت دریافت شد ✅';
+
+  if (currentMarker) {
+    map.removeLayer(currentMarker);
+  }
+
+  if (accuracyCircle) {
+    map.removeLayer(accuracyCircle);
+  }
+
+  currentMarker = L.marker([lat, lng])
+    .addTo(map)
+    .bindPopup('📍 موقعیت فعلی شما')
+    .openPopup();
+
+  accuracyCircle = L.circle([lat, lng], {
+    radius: accuracy,
+    color: '#087e72',
+    fillOpacity: 0.12
+  }).addTo(map);
+
+  map.setView([lat, lng], 17);
+}
+
+// ذخیره موقعیت
+function saveLocation() {
+
+  if (!currentPosition) {
+    alert('ابتدا موقعیت خود را دریافت کنید.');
+    return;
+  }
+
+  const name = prompt('نام این موقعیت را وارد کنید:');
+
+  if (name === null) return;
+
+  const locations = JSON.parse(
+    localStorage.getItem('myGPSLocations') || '[]'
+  );
+
+  locations.push({
+    name: name.trim() || 'موقعیت جدید',
+    lat: currentPosition.lat,
+    lng: currentPosition.lng,
+    accuracy: currentPosition.accuracy,
+    date: new Date().toLocaleString()
+  });
+
+  localStorage.setItem(
+    'myGPSLocations',
+    JSON.stringify(locations)
+  );
+
+  renderSavedLocations();
+
+  alert('موقعیت ذخیره شد ✅');
+}
+
+// نمایش موقعیت‌های ذخیره شده
+function renderSavedLocations() {
+
+  const locations = JSON.parse(
+    localStorage.getItem('myGPSLocations') || '[]'
+  );
+
+  const container = document.getElementById('savedLocations');
+  container.replaceChildren();
+
+  if (locations.length === 0) {
+    container.textContent = 'هنوز موقعیتی ذخیره نشده است.';
+    return;
+  }
+
+  locations.forEach((item, index) => {
+
+    const box = document.createElement('div');
+    box.className = 'saved-item';
+
+    const title = document.createElement('strong');
+    title.textContent = '📍 ' + item.name;
+
+    const details = document.createElement('div');
+    details.style.direction = 'ltr';
+    details.style.marginTop = '8px';
+    details.textContent =
+      item.lat.toFixed(7) + ', ' + item.lng.toFixed(7);
+
+    const date = document.createElement('div');
+    date.style.marginTop = '5px';
+    date.textContent = item.date;
+
+    const showButton = document.createElement('button');
+    showButton.textContent = 'نمایش روی نقشه';
+    showButton.onclick = () => {
+      map.setView([item.lat, item.lng], 17);
+      L.marker([item.lat, item.lng])
+        .addTo(map)
+        .bindPopup(item.name)
+        .openPopup();
+    };
+
+    const shareButton = document.createElement('button');
+    shareButton.textContent = 'اشتراک‌گذاری';
+    shareButton.onclick = () => shareSaved(item);
+
+    const deleteButton = document.createElement('button');
+    deleteButton.textContent = 'حذف';
+    deleteButton.className = 'red';
+    deleteButton.onclick = () => deleteLocation(index);
+
+    box.append(title, details, date,
+      showButton, shareButton, deleteButton);
+
+    container.appendChild(box);
+  });
+}
+
+// حذف یک موقعیت
+function deleteLocation(index) {
+
+  const locations = JSON.parse(
+    localStorage.getItem('myGPSLocations') || '[]'
+  );
+
+  locations.splice(index, 1);
+
+  localStorage.setItem(
+    'myGPSLocations',
+    JSON.stringify(locations)
+  );
+
+  renderSavedLocations();
+}
+
+// حذف تمام موقعیت‌ها
+function clearLocations() {
+
+  if (!confirm('تمام موقعیت‌های ذخیره‌شده حذف شوند؟')) return;
+
+  localStorage.removeItem('myGPSLocations');
+  renderSavedLocations();
+}
+
+// اشتراک‌گذاری موقعیت فعلی
+async function shareLocation() {
+
+  if (!currentPosition) {
+    alert('ابتدا موقعیت را دریافت کنید.');
+    return;
+  }
+
+  const {lat, lng} = currentPosition;
+
+  const url = `https://www.google.com/maps?q=${lat},${lng}`;
+
+  const data = {
+    title: 'موقعیت من',
+    text: `مختصات من:\nLatitude: ${lat}\nLongitude: ${lng}`,
+    url: url
+  };
+
+  if (navigator.share) {
+    try {
+      await navigator.share(data);
+    } catch(error) {
+      if (error.name !== 'AbortError') {
+        alert('اشتراک‌گذاری انجام نشد.');
+      }
+    }
+  } else {
+    await copyText(data.text + '\n' + url);
+    alert('مختصات کپی شد.');
+  }
+}
+
+// اشتراک موقعیت ذخیره شده
+async function shareSaved(item) {
+
+  const url = `https://www.google.com/maps?q=${item.lat},${item.lng}`;
+
+  const data = {
+    title: item.name,
+    text: `${item.name}\n${item.lat}, ${item.lng}`,
+    url
+  };
+
+  if (navigator.share) {
+    try {
+      await navigator.share(data);
+    } catch(error) {
+      if (error.name !== 'AbortError') {
+        alert('اشتراک‌گذاری انجام نشد.');
+      }
+    }
+  } else {
+    await copyText(data.text + '\n' + url);
+    alert('مختصات کپی شد.');
+  }
+}
+
+// کپی مختصات
+function copyCoordinates() {
+
+  if (!currentPosition) {
+    alert('موقعیت دریافت نشده است.');
+    return;
+  }
+
+  const text =
+    `${currentPosition.lat}, ${currentPosition.lng}`;
+
+  copyText(text).then(() => alert('مختصات کپی شد ✅'));
+}
+
+// کپی متن
+async function copyText(text) {
+
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch(error) {
+    const area = document.createElement('textarea');
+    area.value = text;
+    document.body.appendChild(area);
+    area.select();
+    document.execCommand('copy');
+    area.remove();
+  }
+}
+
+// باز کردن گوگل مپ
+function openGoogleMaps() {
+
+  if (!currentPosition) {
+    alert('ابتدا موقعیت را دریافت کنید.');
+    return;
+  }
+
+  const {lat, lng} = currentPosition;
+
+  window.open(
+    `https://www.google.com/maps?q=${lat},${lng}`,
+    '_blank'
+  );
+}
+
+// ردیابی زنده
+function watchLocation() {
+
+  if (!navigator.geolocation) {
+    alert('GPS پشتیبانی نمی‌شود.');
+    return;
+  }
+
+  if (watchID !== null) {
+    navigator.geolocation.clearWatch(watchID);
+  }
+
+  document.getElementById('status').textContent =
+    'ردیابی زنده فعال شد...';
+
+  watchID = navigator.geolocation.watchPosition(
+    updatePosition,
+    error => {
+      document.getElementById('status').textContent =
+        'خطای ردیابی: ' + error.message;
+    },
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 20000
+    }
+  );
+}
+
+// توقف ردیابی
+function stopTracking() {
+
+  if (watchID !== null) {
+    navigator.geolocation.clearWatch(watchID);
+    watchID = null;
+    document.getElementById('status').textContent =
+      'ردیابی متوقف شد.';
+  }
+}
+
+// نمایش موقعیت‌های قبلی
+renderSavedLocations();
+
+</script>
+</body>
+</html>
